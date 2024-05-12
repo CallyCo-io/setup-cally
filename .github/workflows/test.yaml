@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test-local:
+    name: GitHub Actions Test
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.act }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+        with:
+          path: setup-cally
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./setup-cally
+        with:
+          milliseconds: 2000
+
+      - name: Print Output
+        id: output
+        run: echo "${{ steps.test-action.outputs.time }}"

@@ -1,0 +1,9 @@
+name: Setup Cally
+description: Cally Setup action
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/setup-python@v5
+
+  - run: python --version
+    shell: bash
