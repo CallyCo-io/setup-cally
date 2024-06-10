@@ -1,0 +1,31 @@
+name: Release Setup Cally
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup Python
+      uses: actions/setup-python@v5
+    - name: Install git-changelog
+      run: pip install git-changelog
+    - name: Prepare release notes
+      run: |
+        PREVIOUS=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))
+        git-changelog --filter-commits ${PREVIOUS}..v0.1.0
+        cat NOTES.md
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        body_path: NOTES.md
