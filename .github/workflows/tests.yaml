@@ -1,0 +1,61 @@
+name: Test
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Test Hosted Tool
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        providers:
+          - ''
+          - random@3.6.0
+          - |
+            hashicorp/random@3.6.0,
+            hashicorp/external@2.3.3,
+          - external@2.3.3, random@3.6.0,null@3.2.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: setup-cally
+
+      - name: Setup Cally
+        uses: ./setup-cally
+        with:
+          providers: ${{ matrix.providers }}
+
+      - name: Python Version Print
+        run: python --version
+
+      - name: Cally Version Print
+        run: cally --version
+
+      - name: Test Providers
+        if: matrix.providers != ''
+        env:
+          PROVIDERS: ${{ matrix.providers }}
+        run: |
+          echo ::group::Testing Cally Providers
+          arg=$(echo ${PROVIDERS} | tr -d '\n' | sed 's/ //g' | sed 's/,$//g')
+          readarray -td, providers <<<"$arg,"; unset 'providers[-1]'; declare -p providers;
+          for provider in "${providers[@]}"; do
+            echo "::info::Checking ${provider}"
+            if [[ "${provider}" == *\/* ]]; then
+            src=$(echo "${provider}" | awk -F/ '{print $1}')
+            else
+              src=hashicorp
+              provider=hashicorp/${provider}
+            fi
+            pkg=$(echo "${provider}" | awk -F/ '{print $2}' | awk -F@ '{print $1}')
+            python -c "from importlib import util,sys; sys.exit(0) if util.find_spec(\"cally.providers.$pkg\") else sys.exit(1)"
+            echo "::info::${provider} installed"
+          done
+          echo ::endgroup::
