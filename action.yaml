@@ -1,9 +1,104 @@
 name: Setup Cally
 description: Cally Setup action
+branding:
+  icon: play
+  color: blue
+inputs:
+  cally-version:
+    description: Cally Version
+    default: "latest"
+  cally-repo:
+    description: Cally Repo
+    default: CallyCo-io/Cally
+  python-version:
+    description: Python Version
+    default: "3.12"
+  providers:
+    description: Comma separated list of Terraform providers, ie 'hashicorp/random@3.6.0,cloudflare/cloudflare@4.34.0'
+    default: ''
+  token:
+    description: GitHub token to avoid API rate limiting
+    default: ${{ github.token }}
+
 runs:
   using: "composite"
   steps:
   - uses: actions/setup-python@v5
+    with:
+      python-version: "${{ inputs.python-version }}"
 
-  - run: python --version
+  - name: Retrieve latest
     shell: bash
+    env:
+      GH_TOKEN: ${{ inputs.token }}
+    run: |
+      VERSION=$(gh release view --repo CallyCo-io/Cally --json tagName --jq ".tagName" | tr -d "v")
+      echo "CALLY_VERSION=${VERSION}" >> $GITHUB_ENV
+    if: inputs.cally-version == 'latest'
+
+  - name: Export Version
+    shell: bash
+    run: |
+      VERSION=$(echo ${{ inputs.cally-version }}| tr -d "v")
+      echo "CALLY_VERSION=${VERSION}" >> $GITHUB_ENV
+    if: inputs.cally-version != 'latest'
+
+  - name: Get Release Details
+    id: release
+    shell: bash
+    run: $GITHUB_ACTION_PATH/scripts/get_release.sh
+    env:
+      CALLY_REPO: ${{ inputs.cally-repo }}
+      PROVIDERS: ${{ inputs.providers }}
+
+  - name: Tool Cache
+    id: cache-cally
+    uses: actions/cache@v4
+    with:
+      path: ${{ steps.release.outputs.tool-output-path }}
+      key: ${{ steps.release.outputs.cache-key }}
+
+  - name: Download Release
+    if: steps.cache-cally.outputs.cache-hit != 'true'
+    run: |
+      mkdir -p ${TOOL_OUTPUT_PATH}
+      wget -qO- ${DOWNLOAD_URL} | tar xz -C ${TOOL_OUTPUT_PATH}
+    shell: bash
+    env:
+      DOWNLOAD_URL: ${{ steps.release.outputs.download-url }}
+      TOOL_OUTPUT_PATH: ${{ steps.release.outputs.tool-output-path }}
+
+  - name: Configure Paths
+    run: |
+      echo PATH=$PATH:${TOOL_OUTPUT_PATH}/bin >> $GITHUB_ENV
+      echo PYTHONPATH=${TOOL_OUTPUT_PATH} >> $GITHUB_ENV
+    shell: bash
+    env:
+      TOOL_OUTPUT_PATH: ${{ steps.release.outputs.tool-output-path }}
+
+  - uses: actions/setup-node@v4
+    if: |
+      steps.cache-cally.outputs.cache-hit != 'true' &&
+      inputs.providers != ''
+    with:
+      node-version: "20"
+
+  - name: Install cdktf-cli
+    if: |
+      steps.cache-cally.outputs.cache-hit != 'true' &&
+      inputs.providers != ''
+    shell: bash
+    run: |
+      npm install cdktf-cli
+      echo PATH=:$(pwd)/node_modules/.bin:$PATH >> $GITHUB_ENV
+
+  - name: Build and Install Providers
+    if: |
+      steps.cache-cally.outputs.cache-hit != 'true' &&
+      inputs.providers != ''
+    shell: bash
+    working-directory: ${{ env.RUNNER_CACHE }}
+    run: $GITHUB_ACTION_PATH/scripts/get_providers.sh
+    env:
+      TOOL_OUTPUT_PATH: ${{ steps.release.outputs.tool-output-path }}
+      PROVIDERS: ${{ inputs.providers }}
