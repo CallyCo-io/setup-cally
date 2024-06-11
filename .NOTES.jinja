@@ -20,15 +20,7 @@
 {% endfor %}
 {%- endmacro -%}
 
-{#- macro: render_version -#}
 {%- macro render_version(version) -%}
-{%- if version.tag or version.planned_tag -%}
-## [{{ version.tag or version.planned_tag }}]({{ version.url }}){% if version.date %} - {{ version.date }}{% endif %}
-{%- else -%}
-## Unreleased
-
-<small>[Compare with latest]({{ version.compare_url }})</small>
-{%- endif %}
 {% for type in changelog.sections %}
 {%- if type in version.sections_dict %}
 {%- with section = version.sections_dict[type] %}
@@ -36,8 +28,6 @@
 {%- endwith %}
 {%- endif %}
 {%- endfor %}
-{%- if not (version.tag or version.planned_tag) %}
-<!-- insertion marker -->{% endif %}
 {% endmacro -%}
 
 {#- template -#}

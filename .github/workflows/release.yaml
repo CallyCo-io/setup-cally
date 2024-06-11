@@ -24,9 +24,9 @@ jobs:
       run: pip install git-changelog
     - name: Prepare release notes
       run: |
+        VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
         PREVIOUS=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))
-        git-changelog --filter-commits ${PREVIOUS}..v0.1.0
-        cat NOTES.md
+        git-changelog --filter-commits ${PREVIOUS}..${VERSION}
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
